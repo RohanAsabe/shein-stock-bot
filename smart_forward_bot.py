@@ -21,7 +21,7 @@ destination_chat = "rohan_shein"
 
 MIN_STOCK = 10
 
-client = TelegramClient("forward_session", api_id, api_hash)
+client = TelegramClient("railway_session", api_id, api_hash)
 
 
 # ---------------- CLEAN MESSAGE ----------------
