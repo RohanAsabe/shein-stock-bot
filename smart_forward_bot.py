@@ -27,8 +27,8 @@ source_chats = [
 
 destination_chat = "rohan_shein"
 
-TOTAL_STOCK_LIMIT = 50
-DUPLICATE_TIME = 1800  # 30 minutes
+TOTAL_STOCK_LIMIT = 10
+DUPLICATE_TIME = 600  # 10 minutes
 
 # store sent product links
 sent_links = {}
