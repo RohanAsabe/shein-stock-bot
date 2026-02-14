@@ -118,5 +118,5 @@ async def handler(event):
 
 print("⚡ FINAL INSTANT SHEIN BOT RUNNING...")
 
-client.start()
-client.run_until_disconnected()
+client.connect()
+
