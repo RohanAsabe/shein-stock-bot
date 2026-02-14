@@ -1,6 +1,7 @@
 import re
 import asyncio
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 
 # ---------------- TELEGRAM API ----------------
 
@@ -21,7 +22,9 @@ destination_chat = "rohan_shein"
 
 MIN_STOCK = 10
 
-client = TelegramClient("railway_session", api_id, api_hash)
+SESSION = "1BVtsOLoBu0FrcP9rmRhWo_xfa4ngHGMdCdzIfeRc9cQbQI7RY218jn-QQPH0YJ9XQ0hMz2Sco1u8N3V7iWT9_LhM8ZLt5yAku5d5tBNeBJ2G5OeYaMwzCzN_XrNVjya2jDFWvJEZ08Hc4Lxr99ssAqCAk3c2ISSrrU1XYqPFF7FXAWHF2qQjAKEyyQ2NZJXQdya5jF3qRg7YOLnVyklpeshjLPcp7SJuFSS4xEbOpMnGuJwON4ub_LHlP1mu5a6zN2rxny9I6C-5Wsh9ajoN1OXDJ6V8NNQ8vAQgimc3K45Ig7T8IdBzBNBNnGBixdvqR240HWdBXcNwMTFCuYwrbOIa5YPgCaI="
+
+client = TelegramClient(StringSession(SESSION), api_id, api_hash)
 
 
 # ---------------- CLEAN MESSAGE ----------------
