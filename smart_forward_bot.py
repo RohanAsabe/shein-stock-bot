@@ -118,5 +118,11 @@ async def handler(event):
 
 print("⚡ FINAL INSTANT SHEIN BOT RUNNING...")
 
-client.connect()
+async def main():
+    print("Login starting...")
+    await client.start()
+    print("Login success!")
+
+asyncio.run(main())
+
 
