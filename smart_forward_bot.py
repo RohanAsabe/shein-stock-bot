@@ -28,9 +28,8 @@ source_chats = [
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 600  # 10 minutes
+DUPLICATE_TIME = 60
 
-# store sent product links
 sent_links = {}
 
 
@@ -52,7 +51,7 @@ def clean_message(text):
     return "\n".join([l for l in lines if not any(w.lower() in l.lower() for w in skip_words)])
 
 
-# ---------------- LINK CHECK ----------------
+# ---------------- EXTRACT SHEIN LINK ----------------
 
 def extract_shein_link(text):
     match = re.search(r'https://www\.sheinindia\.in/p/\d+', text)
@@ -97,6 +96,19 @@ def is_duplicate(link):
     return False
 
 
+# ---------------- FORMAT MESSAGE ----------------
+
+def format_message(text, is_men=False):
+    cleaned = clean_message(text)
+
+    if is_men:
+        header = "🔥 MEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
+    else:
+        header = "🚨 SHEIN STOCK ALERT\nAs Shein Stock Alert Rohan\n\n"
+
+    return header + cleaned
+
+
 # ---------------- MAIN HANDLER ----------------
 
 @client.on(events.NewMessage(chats=source_chats))
@@ -120,9 +132,10 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    cleaned_text = clean_message(message_text)
+    # detect MEN channel
+    is_men = "men" in str(event.chat.username).lower()
 
-    # RULE B — check out shein posts
+    # check rules
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -133,28 +146,23 @@ async def handler(event):
         print("Skipped low stock")
         return
 
+    final_text = format_message(message_text, is_men)
+
     try:
-        # send instantly
+        # SEND AS NEW MESSAGE (no forward tag)
         if event.message.photo:
             file = await event.message.download_media()
-            sent = await client.send_file(destination_chat, file, caption=cleaned_text)
+            await client.send_file(destination_chat, file, caption=final_text)
         else:
-            sent = await client.send_message(destination_chat, cleaned_text)
+            await client.send_message(destination_chat, final_text)
 
-        print("⚡ ALERT SENT")
-
-        # auto pin
-        try:
-            await client.pin_message(destination_chat, sent.id, notify=False)
-            print("📌 pinned")
-        except:
-            print("Pin failed")
+        print("⚡ ALERT SENT (no forward tag)")
 
     except Exception as e:
         print("Error:", e)
 
 
-print("⚡ PRO SHEIN BOT RUNNING...")
+print("⚡ BRAND MODE SHEIN BOT RUNNING...")
 
 client.start()
 client.run_until_disconnected()
