@@ -1,5 +1,4 @@
 import re
-import asyncio
 import time
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -23,12 +22,12 @@ source_chats = [
     "TufanLoots"
 ]
 
-# ---------------- DESTINATION ----------------
+# ---------------- DESTINATION CHANNEL ----------------
 
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 60
+DUPLICATE_TIME = 180  # 30 mins
 
 sent_links = {}
 
@@ -98,11 +97,14 @@ def is_duplicate(link):
 
 # ---------------- FORMAT MESSAGE ----------------
 
-def format_message(text, is_men=False):
+def format_message(text, is_men=False, is_women=False):
+
     cleaned = clean_message(text)
 
     if is_men:
         header = "🔥 MEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
+    elif is_women:
+        header = "👗 WOMEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
     else:
         header = "🚨 SHEIN STOCK ALERT\nAs Shein Stock Alert Rohan\n\n"
 
@@ -122,6 +124,7 @@ async def handler(event):
     if not message_text:
         return
 
+    # extract product link
     shein_link = extract_shein_link(message_text)
 
     if not shein_link:
@@ -132,10 +135,13 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    # detect MEN channel
-    is_men = "men" in str(event.chat.username).lower()
+    # detect channel type EXACTLY
+    chat_name = str(event.chat.username).lower()
 
-    # check rules
+    is_men = chat_name == "lootversemen"
+    is_women = chat_name == "lootversewomen"
+
+    # decide sending
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -146,23 +152,23 @@ async def handler(event):
         print("Skipped low stock")
         return
 
-    final_text = format_message(message_text, is_men)
+    final_text = format_message(message_text, is_men, is_women)
 
     try:
-        # SEND AS NEW MESSAGE (no forward tag)
+        # send as new message (no forward tag)
         if event.message.photo:
             file = await event.message.download_media()
             await client.send_file(destination_chat, file, caption=final_text)
         else:
             await client.send_message(destination_chat, final_text)
 
-        print("⚡ ALERT SENT (no forward tag)")
+        print("⚡ ALERT SENT")
 
     except Exception as e:
         print("Error:", e)
 
 
-print("⚡ BRAND MODE SHEIN BOT RUNNING...")
+print("⚡ FINAL BRAND MODE SHEIN BOT RUNNING...")
 
 client.start()
 client.run_until_disconnected()
