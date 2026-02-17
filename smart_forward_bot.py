@@ -63,23 +63,25 @@ def is_check_out_shein_post(text):
     return "check out shein on shein" in text.lower()
 
 
-# ---------------- TOTAL STOCK (UPDATED) ----------------
+# ---------------- SAFE STOCK DETECTION ----------------
 
 def total_stock(text):
 
     text_upper = text.upper()
+    total = 0
 
-    # capture ALL stock patterns:
-    # M : 12
-    # ONE SIZE : 20
-    # Size 36: 12
-    # Size 28: 8
-    matches = re.findall(r':\s*(\d+)', text_upper)
+    # detect ONLY size lines
+    size_lines = re.findall(
+        r'(SIZE.*?:\s*\d+|XS.*?:\s*\d+|S.*?:\s*\d+|M.*?:\s*\d+|L.*?:\s*\d+|XL.*?:\s*\d+|XXL.*?:\s*\d+|XXXL.*?:\s*\d+|ONE SIZE.*?:\s*\d+)',
+        text_upper
+    )
 
-    if not matches:
-        return 0
+    for line in size_lines:
+        match = re.search(r':\s*(\d+)', line)
+        if match:
+            total += int(match.group(1))
 
-    return sum(int(num) for num in matches)
+    return total
 
 
 # ---------------- DUPLICATE FILTER ----------------
@@ -134,13 +136,13 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    # detect MEN / WOMEN channel
+    # detect channel type
     chat_name = str(event.chat.username).lower()
 
     is_men = chat_name == "lootversemen"
     is_women = chat_name == "lootversewomen"
 
-    # decide sending logic
+    # sending logic
     if is_check_out_shein_post(message_text):
         send = True
     else:
