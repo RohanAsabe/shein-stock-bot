@@ -22,12 +22,12 @@ source_chats = [
     "TufanLoots"
 ]
 
-# ---------------- DESTINATION CHANNEL ----------------
+# ---------------- DESTINATION ----------------
 
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 180  # 30 mins
+DUPLICATE_TIME = 300
 
 sent_links = {}
 
@@ -53,7 +53,7 @@ def clean_message(text):
 # ---------------- EXTRACT SHEIN LINK ----------------
 
 def extract_shein_link(text):
-    match = re.search(r'https://www\.sheinindia\.in/p/\d+', text)
+    match = re.search(r'https://(www\.)?sheinindia\.in/p/\d+', text)
     return match.group(0) if match else None
 
 
@@ -63,21 +63,21 @@ def is_check_out_shein_post(text):
     return "check out shein on shein" in text.lower()
 
 
-# ---------------- TOTAL STOCK ----------------
+# ---------------- TOTAL STOCK (UPDATED) ----------------
 
 def total_stock(text):
 
     text_upper = text.upper()
 
-    if "SIZES" not in text_upper and "ONE SIZE" not in text_upper:
+    # capture ALL stock patterns:
+    # M : 12
+    # ONE SIZE : 20
+    # Size 36: 12
+    # Size 28: 8
+    matches = re.findall(r':\s*(\d+)', text_upper)
+
+    if not matches:
         return 0
-
-    if "SIZES" in text_upper:
-        stock_part = text_upper.split("SIZES")[-1]
-    else:
-        stock_part = text_upper.split("ONE SIZE")[-1]
-
-    matches = re.findall(r':\s*(\d+)', stock_part)
 
     return sum(int(num) for num in matches)
 
@@ -124,7 +124,6 @@ async def handler(event):
     if not message_text:
         return
 
-    # extract product link
     shein_link = extract_shein_link(message_text)
 
     if not shein_link:
@@ -135,13 +134,13 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    # detect channel type EXACTLY
+    # detect MEN / WOMEN channel
     chat_name = str(event.chat.username).lower()
 
     is_men = chat_name == "lootversemen"
     is_women = chat_name == "lootversewomen"
 
-    # decide sending
+    # decide sending logic
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -155,7 +154,6 @@ async def handler(event):
     final_text = format_message(message_text, is_men, is_women)
 
     try:
-        # send as new message (no forward tag)
         if event.message.photo:
             file = await event.message.download_media()
             await client.send_file(destination_chat, file, caption=final_text)
@@ -168,7 +166,7 @@ async def handler(event):
         print("Error:", e)
 
 
-print("⚡ FINAL BRAND MODE SHEIN BOT RUNNING...")
+print("⚡ FINAL STOCK ENGINE RUNNING...")
 
 client.start()
 client.run_until_disconnected()
