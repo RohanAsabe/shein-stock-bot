@@ -27,10 +27,9 @@ source_chats = [
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 300
+DUPLICATE_TIME = 180
 
 sent_links = {}
-
 
 # ---------------- CLEAN MESSAGE ----------------
 
@@ -48,6 +47,31 @@ def clean_message(text):
 
     lines = text.split("\n")
     return "\n".join([l for l in lines if not any(w.lower() in l.lower() for w in skip_words)])
+
+
+# ---------------- CATEGORY TAGGING ----------------
+
+def detect_category(text):
+
+    text_lower = text.lower()
+    tags = []
+
+    # Tshirt detection
+    tshirt_words = ["tshirt", "t-shirt", "tee", "crew", "oversized tee"]
+    if any(word in text_lower for word in tshirt_words):
+        tags.append("#Tshirt")
+
+    # Jeans detection
+    jeans_words = ["jeans", "denim"]
+    if any(word in text_lower for word in jeans_words):
+        tags.append("#Jeans")
+
+    # Hoodie detection
+    hoodie_words = ["hoodie", "sweatshirt"]
+    if any(word in text_lower for word in hoodie_words):
+        tags.append("#Hoodie")
+
+    return " ".join(tags)
 
 
 # ---------------- EXTRACT SHEIN LINK ----------------
@@ -70,7 +94,6 @@ def total_stock(text):
     text_upper = text.upper()
     total = 0
 
-    # detect ONLY size lines
     size_lines = re.findall(
         r'(SIZE.*?:\s*\d+|XS.*?:\s*\d+|S.*?:\s*\d+|M.*?:\s*\d+|L.*?:\s*\d+|XL.*?:\s*\d+|XXL.*?:\s*\d+|XXXL.*?:\s*\d+|ONE SIZE.*?:\s*\d+)',
         text_upper
@@ -102,6 +125,7 @@ def is_duplicate(link):
 def format_message(text, is_men=False, is_women=False):
 
     cleaned = clean_message(text)
+    category_tags = detect_category(text)
 
     if is_men:
         header = "🔥 MEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
@@ -110,7 +134,9 @@ def format_message(text, is_men=False, is_women=False):
     else:
         header = "🚨 SHEIN STOCK ALERT\nAs Shein Stock Alert Rohan\n\n"
 
-    return header + cleaned
+    footer = f"\n\n{category_tags}" if category_tags else ""
+
+    return header + cleaned + footer
 
 
 # ---------------- MAIN HANDLER ----------------
@@ -136,13 +162,13 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    # detect channel type
+    # detect MEN / WOMEN
     chat_name = str(event.chat.username).lower()
 
     is_men = chat_name == "lootversemen"
     is_women = chat_name == "lootversewomen"
 
-    # sending logic
+    # send logic
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -156,19 +182,19 @@ async def handler(event):
     final_text = format_message(message_text, is_men, is_women)
 
     try:
+        # send HD original image
         if event.message.photo:
-            file = await event.message.download_media()
-            await client.send_file(destination_chat, file, caption=final_text)
+            await client.send_file(destination_chat, event.message.media, caption=final_text)
         else:
             await client.send_message(destination_chat, final_text)
 
-        print("⚡ ALERT SENT")
+        print("⚡ ALERT SENT WITH TAGS")
 
     except Exception as e:
         print("Error:", e)
 
 
-print("⚡ FINAL STOCK ENGINE RUNNING...")
+print("⚡ FINAL TAGGING STOCK ENGINE RUNNING...")
 
 client.start()
 client.run_until_disconnected()
