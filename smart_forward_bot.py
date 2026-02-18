@@ -28,7 +28,7 @@ source_chats = [
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 600  # 10 min
+DUPLICATE_TIME = 600  # 10 minutes
 
 sent_links = {}
 
@@ -69,18 +69,23 @@ def total_stock(text):
         return 0
 
     text_upper = text.upper()
+    total = 0
 
-    # 1) detect 32 : 16
+    # Numeric sizes: 32 : 16
     matches = re.findall(r'\b\d+\s*:\s*(\d+)', text_upper)
-    total = sum(int(num) for num in matches)
+    total += sum(int(num) for num in matches)
 
-    # 2) detect M(5)
-    matches2 = re.findall(r'\b[A-Z]\(\s*(\d+)\s*\)', text_upper)
+    # Letter sizes: S : 6 , M : 9 , XXL : 2
+    matches2 = re.findall(r'\b(?:XS|S|M|L|XL|XXL|XXXL)\s*:\s*(\d+)', text_upper)
     total += sum(int(num) for num in matches2)
 
-    # 3) detect ONE SIZE 12
-    matches3 = re.findall(r'ONE SIZE[^\d]*(\d+)', text_upper)
+    # Bracket sizes: M(5)
+    matches3 = re.findall(r'\b[A-Z]+\(\s*(\d+)\s*\)', text_upper)
     total += sum(int(num) for num in matches3)
+
+    # ONE SIZE
+    matches4 = re.findall(r'ONE SIZE[^\d]*(\d+)', text_upper)
+    total += sum(int(num) for num in matches4)
 
     return total
 
@@ -114,14 +119,14 @@ async def handler(event):
     if not shein_link:
         return
 
-    # duplicate check
+    # duplicate filter
     if is_duplicate(shein_link):
         print("Duplicate skipped")
         return
 
     cleaned_text = clean_message(message_text)
 
-    # RULE 1 — instant checkout alert
+    # RULE 1 — checkout posts instant
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -134,7 +139,7 @@ async def handler(event):
         return
 
     try:
-        # send message/photo
+        # send photo or text
         if event.message.photo:
             file = await event.message.download_media()
             sent = await client.send_file(destination_chat, file, caption=cleaned_text)
