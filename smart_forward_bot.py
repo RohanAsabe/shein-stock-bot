@@ -20,7 +20,7 @@ source_chats = [
     "lootversewomen",
     "sheinxpress",
     "TufanLoots",
-    "sheinstock_rohan_notify_bot"  # NEW SOURCE ADDED
+    "sheinstock_rohan_notify_bot"
 ]
 
 # ---------------- DESTINATION ----------------
@@ -28,7 +28,7 @@ source_chats = [
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 600  # 10 minutes
+DUPLICATE_TIME = 600  # 10 min
 
 sent_links = {}
 
@@ -49,7 +49,7 @@ def clean_message(text):
     lines = text.split("\n")
     return "\n".join([l for l in lines if not any(w.lower() in l.lower() for w in skip_words)])
 
-# ---------------- LINK CHECK ----------------
+# ---------------- LINK DETECTION ----------------
 
 def extract_shein_link(text):
     if not text:
@@ -57,12 +57,12 @@ def extract_shein_link(text):
     match = re.search(r'https?://\S*shein\S+', text)
     return match.group(0) if match else None
 
-# ---------------- CHECK "CHECK OUT" POSTS ----------------
+# ---------------- CHECK OUT POSTS ----------------
 
 def is_check_out_shein_post(text):
     return "check out shein on shein" in text.lower()
 
-# ---------------- TOTAL STOCK (FINAL VERSION) ----------------
+# ---------------- FINAL STOCK DETECTOR ----------------
 
 def total_stock(text):
     if not text:
@@ -70,21 +70,17 @@ def total_stock(text):
 
     text_upper = text.upper()
 
-    # must contain size words
-    if "SIZE" not in text_upper and "SIZES" not in text_upper and "ONE SIZE" not in text_upper:
-        return 0
+    # 1) detect 32 : 16
+    matches = re.findall(r'\b\d+\s*:\s*(\d+)', text_upper)
+    total = sum(int(num) for num in matches)
 
-    patterns = [
-        r':\s*(\d+)',              # 32 : 16
-        r'\b[A-Z]\(\s*(\d+)\s*\)', # M(5)
-        r'ONE SIZE[^\d]*(\d+)',    # ONE SIZE : 12
-    ]
+    # 2) detect M(5)
+    matches2 = re.findall(r'\b[A-Z]\(\s*(\d+)\s*\)', text_upper)
+    total += sum(int(num) for num in matches2)
 
-    total = 0
-
-    for pattern in patterns:
-        matches = re.findall(pattern, text_upper)
-        total += sum(int(num) for num in matches)
+    # 3) detect ONE SIZE 12
+    matches3 = re.findall(r'ONE SIZE[^\d]*(\d+)', text_upper)
+    total += sum(int(num) for num in matches3)
 
     return total
 
@@ -118,18 +114,19 @@ async def handler(event):
     if not shein_link:
         return
 
-    # duplicate filter
+    # duplicate check
     if is_duplicate(shein_link):
         print("Duplicate skipped")
         return
 
     cleaned_text = clean_message(message_text)
 
-    # RULE 1 — checkout post instant send
+    # RULE 1 — instant checkout alert
     if is_check_out_shein_post(message_text):
         send = True
     else:
         stock_sum = total_stock(message_text)
+        print("Stock detected:", stock_sum)
         send = stock_sum >= TOTAL_STOCK_LIMIT
 
     if not send:
@@ -137,7 +134,7 @@ async def handler(event):
         return
 
     try:
-        # send instantly
+        # send message/photo
         if event.message.photo:
             file = await event.message.download_media()
             sent = await client.send_file(destination_chat, file, caption=cleaned_text)
