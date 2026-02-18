@@ -1,4 +1,5 @@
 import re
+import asyncio
 import time
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -10,7 +11,6 @@ api_hash = "dc229a7f5288f2338cb5ec7d5830e0b1"
 
 SESSION = "1BVtsOLoBu0FrcP9rmRhWo_xfa4ngHGMdCdzIfeRc9cQbQI7RY218jn-QQPH0YJ9XQ0hMz2Sco1u8N3V7iWT9_LhM8ZLt5yAku5d5tBNeBJ2G5OeYaMwzCzN_XrNVjya2jDFWvJEZ08Hc4Lxr99ssAqCAk3c2ISSrrU1XYqPFF7FXAWHF2qQjAKEyyQ2NZJXQdya5jF3qRg7YOLnVyklpeshjLPcp7SJuFSS4xEbOpMnGuJwON4ub_LHlP1mu5a6zN2rxny9I6C-5Wsh9ajoN1OXDJ6V8NNQ8vAQgimc3K45Ig7T8IdBzBNBNnGBixdvqR240HWdBXcNwMTFCuYwrbOIa5YPgCaI="
 
-
 client = TelegramClient(StringSession(SESSION), api_id, api_hash)
 
 # ---------------- SOURCE CHANNELS ----------------
@@ -19,7 +19,8 @@ source_chats = [
     "lootversemen",
     "lootversewomen",
     "sheinxpress",
-    "TufanLoots"
+    "TufanLoots",
+    "sheinstock_rohan_notify_bot"  # NEW SOURCE ADDED
 ]
 
 # ---------------- DESTINATION ----------------
@@ -27,7 +28,7 @@ source_chats = [
 destination_chat = "rohan_shein"
 
 TOTAL_STOCK_LIMIT = 10
-DUPLICATE_TIME = 180
+DUPLICATE_TIME = 600  # 10 minutes
 
 sent_links = {}
 
@@ -48,64 +49,44 @@ def clean_message(text):
     lines = text.split("\n")
     return "\n".join([l for l in lines if not any(w.lower() in l.lower() for w in skip_words)])
 
-
-# ---------------- CATEGORY TAGGING ----------------
-
-def detect_category(text):
-
-    text_lower = text.lower()
-    tags = []
-
-    # Tshirt detection
-    tshirt_words = ["tshirt", "t-shirt", "tee", "crew", "oversized tee"]
-    if any(word in text_lower for word in tshirt_words):
-        tags.append("#Tshirt")
-
-    # Jeans detection
-    jeans_words = ["jeans", "denim"]
-    if any(word in text_lower for word in jeans_words):
-        tags.append("#Jeans")
-
-    # Hoodie detection
-    hoodie_words = ["hoodie", "sweatshirt"]
-    if any(word in text_lower for word in hoodie_words):
-        tags.append("#Hoodie")
-
-    return " ".join(tags)
-
-
-# ---------------- EXTRACT SHEIN LINK ----------------
+# ---------------- LINK CHECK ----------------
 
 def extract_shein_link(text):
-    match = re.search(r'https://(www\.)?sheinindia\.in/p/\d+', text)
+    if not text:
+        return None
+    match = re.search(r'https?://\S*shein\S+', text)
     return match.group(0) if match else None
 
-
-# ---------------- CHECK NEW DROP ----------------
+# ---------------- CHECK "CHECK OUT" POSTS ----------------
 
 def is_check_out_shein_post(text):
     return "check out shein on shein" in text.lower()
 
-
-# ---------------- SAFE STOCK DETECTION ----------------
+# ---------------- TOTAL STOCK (FINAL VERSION) ----------------
 
 def total_stock(text):
+    if not text:
+        return 0
 
     text_upper = text.upper()
+
+    # must contain size words
+    if "SIZE" not in text_upper and "SIZES" not in text_upper and "ONE SIZE" not in text_upper:
+        return 0
+
+    patterns = [
+        r':\s*(\d+)',              # 32 : 16
+        r'\b[A-Z]\(\s*(\d+)\s*\)', # M(5)
+        r'ONE SIZE[^\d]*(\d+)',    # ONE SIZE : 12
+    ]
+
     total = 0
 
-    size_lines = re.findall(
-        r'(SIZE.*?:\s*\d+|XS.*?:\s*\d+|S.*?:\s*\d+|M.*?:\s*\d+|L.*?:\s*\d+|XL.*?:\s*\d+|XXL.*?:\s*\d+|XXXL.*?:\s*\d+|ONE SIZE.*?:\s*\d+)',
-        text_upper
-    )
-
-    for line in size_lines:
-        match = re.search(r':\s*(\d+)', line)
-        if match:
-            total += int(match.group(1))
+    for pattern in patterns:
+        matches = re.findall(pattern, text_upper)
+        total += sum(int(num) for num in matches)
 
     return total
-
 
 # ---------------- DUPLICATE FILTER ----------------
 
@@ -118,26 +99,6 @@ def is_duplicate(link):
 
     sent_links[link] = now
     return False
-
-
-# ---------------- FORMAT MESSAGE ----------------
-
-def format_message(text, is_men=False, is_women=False):
-
-    cleaned = clean_message(text)
-    category_tags = detect_category(text)
-
-    if is_men:
-        header = "🔥 MEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
-    elif is_women:
-        header = "👗 WOMEN PRIORITY STOCK\nAs Shein Stock Alert Rohan\n\n"
-    else:
-        header = "🚨 SHEIN STOCK ALERT\nAs Shein Stock Alert Rohan\n\n"
-
-    footer = f"\n\n{category_tags}" if category_tags else ""
-
-    return header + cleaned + footer
-
 
 # ---------------- MAIN HANDLER ----------------
 
@@ -162,13 +123,9 @@ async def handler(event):
         print("Duplicate skipped")
         return
 
-    # detect MEN / WOMEN
-    chat_name = str(event.chat.username).lower()
+    cleaned_text = clean_message(message_text)
 
-    is_men = chat_name == "lootversemen"
-    is_women = chat_name == "lootversewomen"
-
-    # send logic
+    # RULE 1 — checkout post instant send
     if is_check_out_shein_post(message_text):
         send = True
     else:
@@ -179,22 +136,27 @@ async def handler(event):
         print("Skipped low stock")
         return
 
-    final_text = format_message(message_text, is_men, is_women)
-
     try:
-        # send HD original image
+        # send instantly
         if event.message.photo:
-            await client.send_file(destination_chat, event.message.media, caption=final_text)
+            file = await event.message.download_media()
+            sent = await client.send_file(destination_chat, file, caption=cleaned_text)
         else:
-            await client.send_message(destination_chat, final_text)
+            sent = await client.send_message(destination_chat, cleaned_text)
 
-        print("⚡ ALERT SENT WITH TAGS")
+        print("⚡ ALERT SENT")
+
+        # auto pin
+        try:
+            await client.pin_message(destination_chat, sent.id, notify=False)
+            print("📌 pinned")
+        except:
+            print("Pin failed")
 
     except Exception as e:
         print("Error:", e)
 
-
-print("⚡ FINAL TAGGING STOCK ENGINE RUNNING...")
+print("⚡ PRO SHEIN BOT RUNNING...")
 
 client.start()
 client.run_until_disconnected()
