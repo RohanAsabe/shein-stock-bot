@@ -1,5 +1,4 @@
 import re
-import asyncio
 import time
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -9,7 +8,7 @@ from telethon.sessions import StringSession
 api_id = 37734548
 api_hash = "dc229a7f5288f2338cb5ec7d5830e0b1"
 
-SESSION = "1BVtsOLoBu0FrcP9rmRhWo_xfa4ngHGMdCdzIfeRc9cQbQI7RY218jn-QQPH0YJ9XQ0hMz2Sco1u8N3V7iWT9_LhM8ZLt5yAku5d5tBNeBJ2G5OeYaMwzCzN_XrNVjya2jDFWvJEZ08Hc4Lxr99ssAqCAk3c2ISSrrU1XYqPFF7FXAWHF2qQjAKEyyQ2NZJXQdya5jF3qRg7YOLnVyklpeshjLPcp7SJuFSS4xEbOpMnGuJwON4ub_LHlP1mu5a6zN2rxny9I6C-5Wsh9ajoN1OXDJ6V8NNQ8vAQgimc3K45Ig7T8IdBzBNBNnGBixdvqR240HWdBXcNwMTFCuYwrbOIa5YPgCaI="
+SESSION = "YOUR_STRING_SESSION_HERE"
 
 client = TelegramClient(StringSession(SESSION), api_id, api_hash)
 
@@ -62,28 +61,34 @@ def extract_shein_link(text):
 def is_check_out_shein_post(text):
     return "check out shein on shein" in text.lower()
 
-# ---------------- FINAL STOCK DETECTOR ----------------
+# ---------------- FINAL BULLETPROOF STOCK DETECTOR ----------------
 
 def total_stock(text):
     if not text:
         return 0
 
+    # 🔧 NORMALIZE TELEGRAM FORMATTING
+    text = text.replace('\xa0', ' ')
+    text = text.replace('–', '-')
+    text = text.replace('—', '-')
+
     text_upper = text.upper()
+
     total = 0
 
-    # Numeric sizes: 32 : 16
-    matches = re.findall(r'\b\d+\s*:\s*(\d+)', text_upper)
+    # 1️⃣ Numeric sizes → 32 : 19
+    matches = re.findall(r'\d+\s*:\s*(\d+)', text_upper)
     total += sum(int(num) for num in matches)
 
-    # Letter sizes: S : 6 , M : 9 , XXL : 2
-    matches2 = re.findall(r'\b(?:XS|S|M|L|XL|XXL|XXXL)\s*:\s*(\d+)', text_upper)
+    # 2️⃣ Letter sizes → S : 24 , XXL : 29
+    matches2 = re.findall(r'(?:XS|S|M|L|XL|XXL|XXXL)\s*:\s*(\d+)', text_upper)
     total += sum(int(num) for num in matches2)
 
-    # Bracket sizes: M(5)
-    matches3 = re.findall(r'\b[A-Z]+\(\s*(\d+)\s*\)', text_upper)
+    # 3️⃣ Bracket sizes → M(5)
+    matches3 = re.findall(r'[A-Z]+\(\s*(\d+)\s*\)', text_upper)
     total += sum(int(num) for num in matches3)
 
-    # ONE SIZE
+    # 4️⃣ ONE SIZE → ONE SIZE : 12
     matches4 = re.findall(r'ONE SIZE[^\d]*(\d+)', text_upper)
     total += sum(int(num) for num in matches4)
 
@@ -119,19 +124,19 @@ async def handler(event):
     if not shein_link:
         return
 
-    # duplicate filter
+    # Duplicate check
     if is_duplicate(shein_link):
         print("Duplicate skipped")
         return
 
     cleaned_text = clean_message(message_text)
 
-    # RULE 1 — checkout posts instant
+    # Rule 1: Checkout posts instant send
     if is_check_out_shein_post(message_text):
         send = True
     else:
         stock_sum = total_stock(message_text)
-        print("Stock detected:", stock_sum)
+        print("STOCK DETECTED =", stock_sum)
         send = stock_sum >= TOTAL_STOCK_LIMIT
 
     if not send:
@@ -139,7 +144,6 @@ async def handler(event):
         return
 
     try:
-        # send photo or text
         if event.message.photo:
             file = await event.message.download_media()
             sent = await client.send_file(destination_chat, file, caption=cleaned_text)
@@ -148,7 +152,7 @@ async def handler(event):
 
         print("⚡ ALERT SENT")
 
-        # auto pin
+        # Auto pin
         try:
             await client.pin_message(destination_chat, sent.id, notify=False)
             print("📌 pinned")
