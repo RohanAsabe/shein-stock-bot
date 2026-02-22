@@ -17,7 +17,6 @@ client = TelegramClient(StringSession(SESSION), api_id, api_hash)
 
 source_chats = [
     "lootversemen",
-    "lootversewomen",
     "sheinxpress",
     "TufanLoots",
     "sheinstock_rohan_notify_bot"
